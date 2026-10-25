@@ -1,0 +1,212 @@
+from datetime import datetime
+
+
+class Queue:
+    def __init__(self):
+        self.items = []          # index 0 = front of the line
+
+    def is_empty(self):
+        return len(self.items) == 0
+
+    def enqueue(self, student):
+        self.items.append(student)       # add to the back
+
+    def dequeue(self):
+        if self.is_empty():
+            return None
+        return self.items.pop(0)         # remove from the front
+
+    def peek(self):
+        if self.is_empty():
+            return None
+        return self.items[0]             # look only, no removing
+
+    def queue_number_exists(self, number):
+        for s in self.items:
+            if s["queue_no"] == number:
+                return True
+        return False
+
+    def student_in_queue(self, student_id):
+        for s in self.items:
+            if s["id"] == student_id:
+                return True
+        return False
+
+
+waiting = Queue()
+served = []
+appointments = []
+
+
+def find_appointment(student_id):
+    for a in appointments:
+        if a["id"] == student_id:
+            return a
+    return None
+
+
+# ISSUE 1: checks BOTH waiting and served
+def queue_number_used(number):
+    if waiting.queue_number_exists(number):
+        return True
+    for s in served:
+        if s["queue_no"] == number:
+            return True
+    return False
+
+
+# ISSUE 3: date and time validators
+def is_valid_date(text):
+    if len(text) != 10:              # must be exactly YYYY-MM-DD
+        return False
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def is_valid_time(text):
+    if len(text) != 5:               # must be exactly HH:MM
+        return False
+    try:
+        datetime.strptime(text, "%H:%M")
+        return True
+    except ValueError:
+        return False
+
+
+def book_appointment():
+    first_name = input("First name: ").strip()
+    last_name = input("Last name: ").strip()
+    student_id = input("Student ID number: ").strip()
+    date = input("Appointment date (YYYY-MM-DD, e.g. 2026-10-25): ").strip()
+    time = input("Appointment time (HH:MM 24-hour, e.g. 14:30): ").strip()
+
+    if first_name == "" or last_name == "" or student_id == "" or time == "" or date == "":
+        print("Error: all fields are required.")
+        return
+    if not is_valid_date(date):
+        print("Error: invalid date. Use YYYY-MM-DD (example: 2026-10-25).")
+        return
+    if not is_valid_time(time):
+        print("Error: invalid time. Use HH:MM 24-hour (example: 14:30).")
+        return
+    if find_appointment(student_id) is not None:
+        print("Error: this student already has an appointment.")
+        return
+
+    print(f"\n{first_name} {last_name} | {student_id} | {date} {time}")
+    if input("Confirm appointment? (y/n): ").lower() == "y":
+        appointments.append({
+            "first_name": first_name,
+            "last_name": last_name,
+            "id": student_id,
+            "time": time,
+            "date": date,
+        })
+        print("Appointment confirmed.")
+    else:
+        print("Appointment cancelled.")
+
+
+def add_student_to_queue():
+    student_id = input("Student ID number: ").strip()
+
+    # check if the student has an appointment
+    appt = find_appointment(student_id)
+    if appt is None:
+        print("Error: no appointment found for this student.")
+        return
+    if waiting.student_in_queue(student_id):
+        print("Error: student is already in the queue.")
+        return
+
+    # ISSUE 2: use the name saved in the appointment
+    first_name = appt["first_name"]
+    last_name = appt["last_name"]
+    print(f"Student found: {first_name} {last_name}")
+
+    # generate the queue number: "2026-" + ID number + length of last name
+    queue_no = "2026-" + student_id + str(len(last_name))
+
+    # ISSUE 1: check waiting AND served
+    if queue_number_used(queue_no):
+        print("Error: queue number already exists.")
+        return
+
+    print(f"Generated queue number: {queue_no}")
+    if input("Confirm add to queue? (y/n): ").lower() != "y":
+        print("Cancelled.")
+        return
+
+    waiting.enqueue({
+        "queue_no": queue_no,
+        "name": f"{first_name} {last_name}",
+        "id": student_id,
+        "date": appt["date"],
+        "time": appt["time"],
+        "status": "Waiting",
+    })
+    print(f"{first_name} {last_name} added to the queue. Status: Waiting")
+
+
+def peek_first():
+    s = waiting.peek()
+    if s is None:
+        print("Queue is empty.")
+        return
+    print(f"Next: {s['queue_no']} | {s['name']} ({s['id']}) | {s['date']} {s['time']} | {s['status']}")
+
+
+def serve_next():
+    s = waiting.dequeue()
+    if s is None:
+        print("Queue is empty.")
+        return
+    s["status"] = "Served"
+    served.append(s)
+    print(f"Now serving: {s['queue_no']} | {s['name']}. Status: Served")
+
+
+def display_queue():
+    if waiting.is_empty() and len(served) == 0:
+        print("Queue is empty.")
+        return
+    print(f"\n{'Queue No':<14}{'Name':<18}{'ID':<10}{'Schedule':<20}{'Status'}")
+    print("-" * 70)
+    for s in served + waiting.items:
+        schedule = f"{s['date']} {s['time']}"
+        print(f"{s['queue_no']:<14}{s['name']:<18}{s['id']:<10}{schedule:<20}{s['status']}")
+
+
+def main():
+    while True:
+        print("\n=== CampusQ: School Office Appointment Management System ===")
+        print("1. Book an appointment")
+        print("2. Add student to queue")
+        print("3. Peek first student")
+        print("4. Serve next student")
+        print("5. Display queue")
+        print("6. Exit")
+        choice = input("Select a choice: ").strip()
+
+        if choice == "1":
+            book_appointment()
+        elif choice == "2":
+            add_student_to_queue()
+        elif choice == "3":
+            peek_first()
+        elif choice == "4":
+            serve_next()
+        elif choice == "5":
+            display_queue()
+        elif choice == "6":
+            print("Exiting the program.")
+            break
+        else:
+            print("Invalid input. Please choose 1-6.")
+
+
+main()
